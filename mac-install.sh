@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-#  🐝 WORKER BEE — MAC INSTALLER v3.0
+#  🐝 WORKER BEE — MAC INSTALLER v3.1
 #  Paste into macOS Terminal or iTerm2 and press Enter.
 #  Installs everything. Takes 10-20 min. Do not close window.
 # ================================================================
@@ -16,10 +16,10 @@ hdr()  { echo -e "\n${BLD}${AMB}══ $1 ══${NC}\n"; }
 
 clear
 echo -e "${AMB}${BLD}"
-echo "  🐝  WORKER BEE — MAC INSTALLER v3.0"
+echo "  🐝  WORKER BEE — MAC INSTALLER v3.1"
 echo "  ======================================"
 echo -e "${NC}${DIM}  Homebrew · Python 3.12 · uv · Ollama · FastAPI"
-echo -e "  Playwright · ChromaDB · Memory · Planner · GitHub${NC}"
+echo -e "  Playwright · ChromaDB · Memory · Planner · Vision${NC}"
 echo ""
 
 hdr "1 / 10  DETECTING YOUR MAC"
@@ -34,6 +34,7 @@ else
     warn "Intel Mac — CPU only"
     CHIP="intel"
 fi
+
 if   [ "$RAM_GB" -ge 64 ]; then
     PRIMARY="llama3.3:70b"
     CODING="qwen2.5-coder:32b"
@@ -55,7 +56,7 @@ sleep 1
 
 hdr "2 / 10  HOMEBREW"
 if command -v brew &>/dev/null; then
-    ok "Already installed — updating"
+    ok "Already installed"
     brew update --quiet 2>/dev/null || true
 else
     log "Installing Homebrew..."
@@ -90,7 +91,7 @@ fi
 ok "Ollama running on :11434"
 
 hdr "5 / 10  PROJECT FOLDER + VENV"
-mkdir -p ~/worker-bee/agent/tools ~/worker-bee/projects
+mkdir -p ~/worker-bee/agent/tools ~/worker-bee/projects ~/worker-bee/.cookies
 cd ~/worker-bee
 uv venv .venv --quiet
 source .venv/bin/activate
@@ -109,7 +110,7 @@ mkdir -p ~/.ssl
 openssl req -x509 -newkey rsa:4096 \
     -keyout ~/.ssl/key.pem -out ~/.ssl/cert.pem \
     -days 365 -nodes -subj "/CN=localhost" 2>/dev/null
-ok "SSL cert ready — valid 365 days"
+ok "SSL cert ready"
 
 hdr "7 / 10  WRITING ALL AGENT FILES"
 
@@ -130,7 +131,7 @@ runners = {}
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "worker-bee-agent", "version": "3.0.0"}
+    return {"status": "ok", "service": "worker-bee-agent", "version": "3.1.0"}
 
 @app.get("/api/tags")
 async def tags():
@@ -175,7 +176,7 @@ from .tools.memory import MemoryTool
 from .tools.planner import TaskPlanner
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-MODEL  = os.getenv("DEFAULT_MODEL", "llama3.3:70b")
+MODEL  = os.getenv("DEFAULT_MODEL", "llama3.2")
 
 def pick_model(message: str) -> str:
     """Auto-route to the best model for the task."""
@@ -198,7 +199,7 @@ def pick_model(message: str) -> str:
         "website", "webpage", "navbar", "footer",
         "button", "form", "style", "animation"
     ]):
-        return "qwen2.5-coder:32b"
+        return os.getenv("CODING_MODEL", "qwen2.5-coder:32b")
 
     if any(w in msg for w in [
         "why ", "explain", "analyze", "diagnose",
@@ -213,9 +214,9 @@ def pick_model(message: str) -> str:
         "how does", "what causes", "deep dive",
         "thorough", "detailed", "comprehensive"
     ]):
-        return "deepseek-r1:70b"
+        return os.getenv("REASON_MODEL", "deepseek-r1:32b")
 
-    return "llama3.3:70b"
+    return MODEL
 
 class AgentRunner:
     def __init__(self, tab_id: str, ws):
@@ -233,23 +234,25 @@ class AgentRunner:
 
     async def handle(self, msg: dict):
         a = msg.get("action")
-        if   a == "chat":          await self.chat(msg)
-        elif a == "browser":       await self.run_browser(msg)
-        elif a == "shell":         await self.run_shell(msg)
-        elif a == "vision":        await self.run_vision(msg)
-        elif a == "login":         await self.run_login(msg)
-        elif a == "gmail":         await self.run_gmail(msg)
-        elif a == "get_tags":      await self.run_get_tags()
-        elif a == "get_ps":        await self.run_get_ps()
-        elif a == "github":        await self.run_github(msg)
-        elif a == "self_repair":   await self.run_self_repair(msg)
-        elif a == "plan":          await self.run_plan(msg)
-        elif a == "plan_stop":     self.planner.stop()
-        elif a == "plan_pause":    self.planner.pause()
-        elif a == "plan_resume":   self.planner.resume()
-        elif a == "memory_search": await self.run_memory_search(msg)
-        elif a == "memory_store":  await self.run_memory_store(msg)
-        elif a == "memory_stats":  await self.run_memory_stats()
+        if   a == "chat":           await self.chat(msg)
+        elif a == "browser":        await self.run_browser(msg)
+        elif a == "shell":          await self.run_shell(msg)
+        elif a == "vision":         await self.run_vision(msg)
+        elif a == "login":          await self.run_login(msg)
+        elif a == "gmail":          await self.run_gmail(msg)
+        elif a == "get_tags":       await self.run_get_tags()
+        elif a == "get_ps":         await self.run_get_ps()
+        elif a == "github":         await self.run_github(msg)
+        elif a == "self_repair":    await self.run_self_repair(msg)
+        elif a == "plan":           await self.run_plan(msg)
+        elif a == "plan_stop":      self.planner.stop()
+        elif a == "plan_pause":     self.planner.pause()
+        elif a == "plan_resume":    self.planner.resume()
+        elif a == "memory_search":  await self.run_memory_search(msg)
+        elif a == "memory_store":   await self.run_memory_store(msg)
+        elif a == "memory_stats":   await self.run_memory_stats()
+        elif a == "vision_report":  await self.run_vision_report(msg)
+        elif a == "save_cookies":   await self.run_save_cookies(msg)
         elif a == "file_read":
             try:
                 await self.send("file_content", {
@@ -400,6 +403,56 @@ class AgentRunner:
             msg.get("error", "Manual repair requested"), ws=self.ws)
         await self.send("repair_complete", {"success": success})
 
+    async def run_vision_report(self, msg: dict):
+        from .tools.vision_reporter import VisionReporter
+        vr = VisionReporter()
+        url   = msg.get("url", "https://worker-bee.lovable.app")
+        label = msg.get("label", "worker-bee-ui")
+        await self.send("status", "Taking screenshot...")
+        result = await self.browser.navigate(url)
+        if not result.get("success"):
+            await self.send("error",
+                f"Screenshot failed: {result.get('error')}")
+            return
+        screenshot_b64 = result.get("screenshot_b64", "")
+        await self.send("status", "Analyzing with llava...")
+        vision = await self.vision_analyze(
+            screenshot_b64,
+            "You are analyzing the Worker Bee AI agent UI. "
+            "Describe: 1) Overall layout and design "
+            "2) Panels and sections visible "
+            "3) Color scheme and theme "
+            "4) UI issues or improvements needed "
+            "5) How does it compare to Claude.ai"
+        )
+        await self.send("status", "Pushing to GitHub...")
+        push_result = await vr.push_screenshot(
+            screenshot_b64, label=label, description=vision)
+        if push_result.get("success"):
+            await self.send("screenshot", {
+                "url": url, "screenshot_b64": screenshot_b64})
+            await self.send("vision_result", {"description": vision})
+            await self.send("vision_report_done", {
+                "github_url": push_result["github_url"],
+                "raw_url":    push_result["url"],
+                "label":      label,
+                "analysis":   vision
+            })
+        else:
+            await self.send("error",
+                f"Push failed: {push_result.get('error')}")
+
+    async def run_save_cookies(self, msg: dict):
+        try:
+            from .tools.cookies import save_cookies
+            domain  = msg.get("domain", "")
+            cookies = msg.get("cookies", [])
+            path    = save_cookies(domain, cookies)
+            await self.send("cookies_saved", {
+                "domain": domain, "count": len(cookies), "path": path})
+        except Exception as e:
+            await self.send("error", str(e))
+
     async def vision_analyze(self, screenshot_b64: str, question: str) -> str:
         try:
             async with httpx.AsyncClient(timeout=60) as c:
@@ -504,7 +557,7 @@ class AgentRunner:
         await self.browser.close()
 
     def _build_system_prompt(self) -> str:
-        return """You are Worker Bee, an autonomous AI agent running locally on a Mac Studio M1 Ultra.
+        return """You are Worker Bee, an autonomous AI agent running locally on a Mac.
 
 You are NOT a generic chatbot. You are a real agent with real capabilities:
 
@@ -516,23 +569,17 @@ MEMORY: Permanent memory across all sessions via ChromaDB.
 GITHUB: Read and write to GitHub repos directly.
 GMAIL: Manage inbox — summarize, archive, delete, unsubscribe.
 PLANNER: Break complex goals into steps and execute autonomously.
+VISION REPORT: Screenshot any URL and push to GitHub for analysis.
 
 FORMATTING RULES — ALWAYS FOLLOW THESE:
 - Use markdown formatting in all responses
 - Put ALL code in fenced code blocks with language tag
 - Put terminal commands in ```zsh blocks
-- Put Lovable prompts in ``` blocks
 - Use **bold** for important terms
 - Use bullet points for lists
 - Use ## headers for sections in long responses
 - Keep responses concise — no unnecessary padding
 - Never write walls of plain text
-
-MODELS IN THIS SYSTEM:
-- llama3.3:70b (you) — conversation and general reasoning
-- deepseek-r1:70b — deep reasoning, architecture, planning
-- qwen2.5-coder:32b — code generation, Lovable prompts
-- llava:latest — vision, screenshot analysis
 
 Be direct, confident, and specific.
 Never say you cannot do something in your capabilities list.
@@ -557,7 +604,8 @@ You are the user's personal autonomous web building agent."""
     async def run_memory_store(self, msg: dict):
         doc_id = self.memory.store_knowledge(
             msg.get("topic", ""), msg.get("content", ""), msg.get("source", ""))
-        await self.send("memory_stored", {"id": doc_id, "topic": msg.get("topic")})
+        await self.send("memory_stored",
+            {"id": doc_id, "topic": msg.get("topic")})
 
     async def run_memory_stats(self):
         await self.send("memory_stats", self.memory.stats())
@@ -568,12 +616,15 @@ You are the user's personal autonomous web building agent."""
             await self.send("plan_error", {"message": "No goal provided"})
             return
         await self.send("plan_started", {"goal": goal})
-        await self.send("plan_log", {"message": f"Planning: {goal}", "level": "info"})
+        await self.send("plan_log",
+            {"message": f"Planning: {goal}", "level": "info"})
         tasks = await self.planner.plan(goal)
         if not tasks:
-            await self.send("plan_error", {"message": "Could not generate a plan"})
+            await self.send("plan_error",
+                {"message": "Could not generate a plan"})
             return
-        await self.send("plan_ready", {"goal": goal, "tasks": tasks, "count": len(tasks)})
+        await self.send("plan_ready",
+            {"goal": goal, "tasks": tasks, "count": len(tasks)})
         result = await self.planner.execute(ws=self.ws)
         await self.send("plan_complete", result)
 RUNNERPY
@@ -581,9 +632,11 @@ RUNNERPY
 log "Writing agent/repair.py..."
 cat > ~/worker-bee/agent/repair.py << 'REPAIRPY'
 import httpx, json, os, asyncio, pathlib, sys
+from dotenv import dotenv_values
 
-OLLAMA = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-MODEL  = os.getenv("DEFAULT_MODEL", "qwen2.5-coder:32b")
+_env = dotenv_values(str(pathlib.Path.home() / "worker-bee" / ".env"))
+OLLAMA = _env.get("OLLAMA_HOST", "http://localhost:11434")
+MODEL  = _env.get("DEFAULT_MODEL", "qwen2.5-coder:32b")
 ROOT   = pathlib.Path.home() / "worker-bee"
 
 WATCHED_FILES = [
@@ -595,6 +648,8 @@ WATCHED_FILES = [
     "agent/tools/planner.py",
     "agent/tools/github.py",
     "agent/tools/gmail.py",
+    "agent/tools/vision_reporter.py",
+    "agent/tools/cookies.py",
     "agent/repair.py",
 ]
 
@@ -808,10 +863,11 @@ MEMORYPY
 
 log "Writing agent/tools/planner.py..."
 cat > ~/worker-bee/agent/tools/planner.py << 'PLANNERPY'
-import httpx, json, os, asyncio, pathlib
-from datetime import datetime
-
-OLLAMA = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+import httpx, json, os, asyncio
+from dotenv import dotenv_values as _dv
+_env = _dv(str(__import__('pathlib').Path.home() / "worker-bee" / ".env"))
+OLLAMA = _env.get("OLLAMA_HOST", "http://localhost:11434")
+REASON_MODEL = _env.get("REASON_MODEL", "deepseek-r1:32b")
 
 class TaskPlanner:
     def __init__(self, runner=None):
@@ -844,7 +900,7 @@ Output ONLY valid JSON:
         try:
             async with httpx.AsyncClient(timeout=120) as c:
                 r = await c.post(f"{OLLAMA}/api/chat", json={
-                    "model": "deepseek-r1:70b",
+                    "model": REASON_MODEL,
                     "messages": [{"role": "user", "content": prompt}],
                     "stream": False
                 })
@@ -965,9 +1021,11 @@ PLANNERPY
 
 log "Writing agent/tools/github.py..."
 cat > ~/worker-bee/agent/tools/github.py << 'GITHUBPY'
-import httpx, os, base64, json
-
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+import httpx, os, base64
+from dotenv import dotenv_values as _dv
+import pathlib
+_env = _dv(str(pathlib.Path.home() / "worker-bee" / ".env"))
+GITHUB_TOKEN = _env.get("GITHUB_TOKEN", "")
 
 class GitHubTool:
     def __init__(self):
@@ -1037,126 +1095,122 @@ class GitHubTool:
                     "status": r.status_code, "path": path}
 GITHUBPY
 
-log "Writing agent/tools/gmail.py..."
-cat > ~/worker-bee/agent/tools/gmail.py << 'GMAILPY'
-import os, pathlib
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
+log "Writing agent/tools/vision_reporter.py..."
+cat > ~/worker-bee/agent/tools/vision_reporter.py << 'VISIONPY'
+import httpx, base64, os, json, pathlib
+from datetime import datetime
+from dotenv import dotenv_values as _dv
 
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/gmail.readonly"
-]
-TOKEN_PATH = pathlib.Path.home() / ".workerbee_gmail_token.json"
-CREDS_PATH = pathlib.Path.home() / ".workerbee_gmail_creds.json"
+_env = _dv(str(pathlib.Path.home() / "worker-bee" / ".env"))
+GITHUB_TOKEN      = _env.get("GITHUB_TOKEN", "")
+VISION_REPO_OWNER = _env.get("VISION_REPO_OWNER", "adobetoby-maker")
+VISION_REPO_NAME  = _env.get("VISION_REPO_NAME", "worker-bee-vision")
 
-class GmailTool:
+class VisionReporter:
     def __init__(self):
-        self._service = None
-
-    def _auth(self):
-        creds = None
-        if TOKEN_PATH.exists():
-            creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                if not CREDS_PATH.exists():
-                    raise FileNotFoundError(
-                        f"Gmail credentials not found at {CREDS_PATH}. "
-                        "Download from Google Cloud Console.")
-                flow = InstalledAppFlow.from_client_secrets_file(str(CREDS_PATH), SCOPES)
-                creds = flow.run_local_server(port=0)
-            TOKEN_PATH.write_text(creds.to_json())
-        self._service = build("gmail", "v1", credentials=creds)
-        return self._service
-
-    def service(self):
-        if not self._service:
-            self._auth()
-        return self._service
-
-    def get_inbox_summary(self) -> dict:
-        svc = self.service()
-        categories = {
-            "unread": "is:unread", "promotions": "category:promotions",
-            "social": "category:social", "updates": "category:updates",
-            "newsletters": "list:* OR unsubscribe",
-            "old_unread": "is:unread older_than:30d",
+        self.headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "WorkerBee-Agent",
+            "Authorization": f"token {GITHUB_TOKEN}"
         }
-        summary = {}
-        for name, query in categories.items():
-            result = svc.users().messages().list(
-                userId="me", q=query, maxResults=1).execute()
-            summary[name] = result.get("resultSizeEstimate", 0)
-        inbox = svc.users().labels().get(userId="me", id="INBOX").execute()
-        summary["total_inbox"] = inbox.get("messagesTotal", 0)
-        return summary
 
-    def get_emails(self, query: str, max_results: int = 20) -> list:
-        svc = self.service()
-        results = svc.users().messages().list(
-            userId="me", q=query, maxResults=max_results).execute()
-        emails = []
-        for m in results.get("messages", []):
-            msg = svc.users().messages().get(
-                userId="me", id=m["id"], format="metadata",
-                metadataHeaders=["From", "Subject", "Date"]).execute()
-            headers = {h["name"]: h["value"] for h in msg["payload"]["headers"]}
-            emails.append({
-                "id": m["id"], "from": headers.get("From", ""),
-                "subject": headers.get("Subject", ""),
-                "date": headers.get("Date", ""),
-                "snippet": msg.get("snippet", "")[:100]
+    async def push_screenshot(self, screenshot_b64: str,
+                               label: str = "",
+                               description: str = "") -> dict:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_label = label.replace(" ", "_").replace("/", "_")[:30]
+        filename = f"screenshots/{ts}_{safe_label}.png"
+        url = (f"https://api.github.com/repos/"
+               f"{VISION_REPO_OWNER}/{VISION_REPO_NAME}"
+               f"/contents/{filename}")
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.put(url, headers=self.headers, json={
+                "message": f"Worker Bee screenshot: {label}",
+                "content": screenshot_b64
             })
-        return emails
+        if r.status_code not in [200, 201]:
+            return {"success": False, "error": f"HTTP {r.status_code}: {r.text[:200]}"}
+        await self.update_readme(filename, label, description, ts)
+        raw_url = (f"https://raw.githubusercontent.com/"
+                   f"{VISION_REPO_OWNER}/{VISION_REPO_NAME}"
+                   f"/main/{filename}")
+        return {
+            "success": True, "filename": filename, "url": raw_url,
+            "github_url": (f"https://github.com/{VISION_REPO_OWNER}/"
+                          f"{VISION_REPO_NAME}/blob/main/{filename}")
+        }
 
-    def archive_emails(self, query: str, max_results: int = 500) -> dict:
-        svc = self.service()
-        results = svc.users().messages().list(
-            userId="me", q=query, maxResults=max_results).execute()
-        messages = results.get("messages", [])
-        if not messages:
-            return {"archived": 0, "message": "No emails found"}
-        ids = [m["id"] for m in messages]
-        svc.users().messages().batchModify(
-            userId="me", body={"ids": ids, "removeLabelIds": ["INBOX"]}).execute()
-        return {"archived": len(ids), "message": f"Archived {len(ids)} emails"}
+    async def update_readme(self, filename: str, label: str,
+                             description: str, ts: str):
+        readme_url = (f"https://api.github.com/repos/"
+                      f"{VISION_REPO_OWNER}/{VISION_REPO_NAME}"
+                      f"/contents/README.md")
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(readme_url, headers=self.headers)
+            sha = r.json().get("sha", "") if r.status_code == 200 else ""
+        raw_url = (f"https://raw.githubusercontent.com/"
+                   f"{VISION_REPO_OWNER}/{VISION_REPO_NAME}"
+                   f"/main/{filename}")
+        content = f"""# Worker Bee Vision Log
 
-    def delete_emails(self, query: str, max_results: int = 500) -> dict:
-        svc = self.service()
-        results = svc.users().messages().list(
-            userId="me", q=query, maxResults=max_results).execute()
-        messages = results.get("messages", [])
-        if not messages:
-            return {"deleted": 0, "message": "No emails found"}
-        ids = [m["id"] for m in messages]
-        svc.users().messages().batchModify(
-            userId="me", body={"ids": ids, "addLabelIds": ["TRASH"]}).execute()
-        return {"deleted": len(ids), "message": f"Moved {len(ids)} to trash"}
+Latest: {ts} — {label}
 
-    def unsubscribe_sender(self, sender_email: str) -> dict:
-        return self.archive_emails(f"from:{sender_email}", max_results=1000)
+![Latest Screenshot]({raw_url})
 
-    def get_top_senders(self, max_results: int = 200) -> list:
-        svc = self.service()
-        results = svc.users().messages().list(
-            userId="me", q="in:inbox", maxResults=max_results).execute()
-        senders = {}
-        for m in results.get("messages", []):
-            msg = svc.users().messages().get(
-                userId="me", id=m["id"], format="metadata",
-                metadataHeaders=["From"]).execute()
-            sender = next(
-                (h["value"] for h in msg["payload"]["headers"] if h["name"] == "From"),
-                "Unknown")
-            senders[sender] = senders.get(sender, 0) + 1
-        return [{"sender": s, "count": c}
-                for s, c in sorted(senders.items(), key=lambda x: x[1], reverse=True)[:20]]
-GMAILPY
+## Analysis
+{description}
+
+## How To Use
+Paste any raw URL from /screenshots into Claude for analysis.
+
+## History
+See /screenshots folder for all captures.
+"""
+        body = {"message": f"Update vision log: {label}",
+                "content": base64.b64encode(content.encode()).decode()}
+        if sha:
+            body["sha"] = sha
+        async with httpx.AsyncClient(timeout=15) as c:
+            await c.put(readme_url, headers=self.headers, json=body)
+
+    async def get_latest_url(self) -> str:
+        url = (f"https://api.github.com/repos/"
+               f"{VISION_REPO_OWNER}/{VISION_REPO_NAME}"
+               f"/contents/screenshots")
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(url, headers=self.headers)
+            if r.status_code != 200:
+                return ""
+            files = r.json()
+            if not files:
+                return ""
+            latest = sorted(files, key=lambda x: x["name"], reverse=True)[0]
+            return (f"https://raw.githubusercontent.com/"
+                    f"{VISION_REPO_OWNER}/{VISION_REPO_NAME}"
+                    f"/main/{latest['path']}")
+VISIONPY
+
+log "Writing agent/tools/cookies.py..."
+cat > ~/worker-bee/agent/tools/cookies.py << 'COOKIEPY'
+import json, pathlib
+
+COOKIE_DIR = pathlib.Path.home() / "worker-bee" / ".cookies"
+COOKIE_DIR.mkdir(exist_ok=True)
+
+def save_cookies(domain: str, cookies: list) -> str:
+    path = COOKIE_DIR / f"{domain.replace('.', '_')}.json"
+    path.write_text(json.dumps(cookies, indent=2))
+    return str(path)
+
+def load_cookies(domain: str) -> list:
+    path = COOKIE_DIR / f"{domain.replace('.', '_')}.json"
+    if not path.exists():
+        return []
+    return json.loads(path.read_text())
+
+def list_saved() -> list:
+    return [f.stem.replace('_', '.') for f in COOKIE_DIR.glob("*.json")]
+COOKIEPY
 
 log "Writing agent/tools/browser.py..."
 cat > ~/worker-bee/agent/tools/browser.py << 'BROWSERPY'
@@ -1191,6 +1245,15 @@ class BrowserTool:
         )
         await ctx.add_init_script(
             "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
+        # Inject saved cookies for this domain
+        try:
+            from .cookies import load_cookies
+            cookies = load_cookies(domain)
+            if cookies:
+                await ctx.add_cookies(cookies)
+                print(f"[BROWSER] Injected {len(cookies)} cookies for {domain}")
+        except Exception as e:
+            pass
         self._contexts[domain] = ctx
         return ctx
 
@@ -1200,7 +1263,7 @@ class BrowserTool:
         ctx    = await self._get_context(domain)
         page   = await ctx.new_page()
         try:
-            await page.goto(url, timeout=30000, wait_until="networkidle")
+            await page.goto(url, timeout=60000, wait_until="domcontentloaded")
             await page.wait_for_timeout(3000)
             for attempt in range(5):
                 error_found = False
@@ -1227,7 +1290,7 @@ class BrowserTool:
                     except Exception:
                         pass
                 if not clicked:
-                    await page.reload(wait_until="networkidle")
+                    await page.reload(wait_until="domcontentloaded")
                 await page.wait_for_timeout(3000 + (attempt * 2000))
             shot = await page.screenshot(full_page=True)
             text = await page.inner_text("body")
@@ -1270,7 +1333,7 @@ class BrowserTool:
         for attempt in range(1, max_attempts + 1):
             page = await ctx.new_page()
             try:
-                await page.goto(url, timeout=30000, wait_until="networkidle")
+                await page.goto(url, timeout=60000, wait_until="domcontentloaded")
                 await page.wait_for_timeout(2000)
                 filled_email = False
                 for sel in EMAIL_SELS:
@@ -1377,7 +1440,7 @@ class BrowserTool:
         ctx  = self._contexts[domain]
         page = await ctx.new_page()
         try:
-            await page.goto(url, timeout=30000, wait_until="networkidle")
+            await page.goto(url, timeout=60000, wait_until="domcontentloaded")
             await page.wait_for_timeout(2000)
             shot = await page.screenshot(full_page=True)
             text = await page.inner_text("body")
@@ -1397,7 +1460,7 @@ class BrowserTool:
         domain = url.split("/")[2] if "//" in url else url
         ctx    = await self._get_context(domain)
         page   = await ctx.new_page()
-        await page.goto(url, timeout=30000, wait_until="networkidle")
+        await page.goto(url, timeout=60000, wait_until="domcontentloaded")
         await page.wait_for_timeout(3000)
         shot = await page.screenshot(full_page=True)
         await page.close()
@@ -1408,7 +1471,7 @@ class BrowserTool:
         domain = url.split("/")[2] if "//" in url else url
         ctx    = await self._get_context(domain)
         page   = await ctx.new_page()
-        await page.goto(url, timeout=30000, wait_until="networkidle")
+        await page.goto(url, timeout=60000, wait_until="domcontentloaded")
         await page.wait_for_timeout(3000)
         text = await page.inner_text("body")
         await page.close()
@@ -1493,15 +1556,139 @@ class ShellTool:
             return {"error": "Timed out", "success": False}
 SHELLPY
 
-log "Writing .env..."
+log "Writing agent/tools/gmail.py..."
+cat > ~/worker-bee/agent/tools/gmail.py << 'GMAILPY'
+import os, pathlib
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
+
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.readonly"
+]
+TOKEN_PATH = pathlib.Path.home() / ".workerbee_gmail_token.json"
+CREDS_PATH = pathlib.Path.home() / ".workerbee_gmail_creds.json"
+
+class GmailTool:
+    def __init__(self):
+        self._service = None
+
+    def _auth(self):
+        creds = None
+        if TOKEN_PATH.exists():
+            creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                if not CREDS_PATH.exists():
+                    raise FileNotFoundError(
+                        f"Gmail credentials not found at {CREDS_PATH}.")
+                flow = InstalledAppFlow.from_client_secrets_file(str(CREDS_PATH), SCOPES)
+                creds = flow.run_local_server(port=0)
+            TOKEN_PATH.write_text(creds.to_json())
+        self._service = build("gmail", "v1", credentials=creds)
+        return self._service
+
+    def service(self):
+        if not self._service:
+            self._auth()
+        return self._service
+
+    def get_inbox_summary(self) -> dict:
+        svc = self.service()
+        categories = {
+            "unread": "is:unread", "promotions": "category:promotions",
+            "social": "category:social", "updates": "category:updates",
+            "newsletters": "list:* OR unsubscribe",
+            "old_unread": "is:unread older_than:30d",
+        }
+        summary = {}
+        for name, query in categories.items():
+            result = svc.users().messages().list(
+                userId="me", q=query, maxResults=1).execute()
+            summary[name] = result.get("resultSizeEstimate", 0)
+        inbox = svc.users().labels().get(userId="me", id="INBOX").execute()
+        summary["total_inbox"] = inbox.get("messagesTotal", 0)
+        return summary
+
+    def get_emails(self, query: str, max_results: int = 20) -> list:
+        svc = self.service()
+        results = svc.users().messages().list(
+            userId="me", q=query, maxResults=max_results).execute()
+        emails = []
+        for m in results.get("messages", []):
+            msg = svc.users().messages().get(
+                userId="me", id=m["id"], format="metadata",
+                metadataHeaders=["From", "Subject", "Date"]).execute()
+            headers = {h["name"]: h["value"] for h in msg["payload"]["headers"]}
+            emails.append({
+                "id": m["id"], "from": headers.get("From", ""),
+                "subject": headers.get("Subject", ""),
+                "date": headers.get("Date", ""),
+                "snippet": msg.get("snippet", "")[:100]
+            })
+        return emails
+
+    def archive_emails(self, query: str, max_results: int = 500) -> dict:
+        svc = self.service()
+        results = svc.users().messages().list(
+            userId="me", q=query, maxResults=max_results).execute()
+        messages = results.get("messages", [])
+        if not messages:
+            return {"archived": 0, "message": "No emails found"}
+        ids = [m["id"] for m in messages]
+        svc.users().messages().batchModify(
+            userId="me", body={"ids": ids, "removeLabelIds": ["INBOX"]}).execute()
+        return {"archived": len(ids), "message": f"Archived {len(ids)} emails"}
+
+    def delete_emails(self, query: str, max_results: int = 500) -> dict:
+        svc = self.service()
+        results = svc.users().messages().list(
+            userId="me", q=query, maxResults=max_results).execute()
+        messages = results.get("messages", [])
+        if not messages:
+            return {"deleted": 0, "message": "No emails found"}
+        ids = [m["id"] for m in messages]
+        svc.users().messages().batchModify(
+            userId="me", body={"ids": ids, "addLabelIds": ["TRASH"]}).execute()
+        return {"deleted": len(ids), "message": f"Moved {len(ids)} to trash"}
+
+    def unsubscribe_sender(self, sender_email: str) -> dict:
+        return self.archive_emails(f"from:{sender_email}", max_results=1000)
+
+    def get_top_senders(self, max_results: int = 200) -> list:
+        svc = self.service()
+        results = svc.users().messages().list(
+            userId="me", q="in:inbox", maxResults=max_results).execute()
+        senders = {}
+        for m in results.get("messages", []):
+            msg = svc.users().messages().get(
+                userId="me", id=m["id"], format="metadata",
+                metadataHeaders=["From"]).execute()
+            sender = next(
+                (h["value"] for h in msg["payload"]["headers"] if h["name"] == "From"),
+                "Unknown")
+            senders[sender] = senders.get(sender, 0) + 1
+        return [{"sender": s, "count": c}
+                for s, c in sorted(senders.items(), key=lambda x: x[1], reverse=True)[:20]]
+GMAILPY
+
+log "Writing .env template..."
 cat > ~/worker-bee/.env << ENVEOF
 OLLAMA_HOST=http://localhost:11434
-DEFAULT_MODEL=llama3.3:70b
+DEFAULT_MODEL=${PRIMARY}
+CODING_MODEL=${CODING}
+REASON_MODEL=${REASON}
 AGENT_PORT=8000
 SAFE_ROOT=${HOME}/worker-bee/projects
 GITHUB_TOKEN=
 GITHUB_REPO_OWNER=
 GITHUB_REPO_NAME=
+VISION_REPO_OWNER=
+VISION_REPO_NAME=worker-bee-vision
 GMAIL_USER=
 SLACK_BOT_TOKEN=
 TWILIO_ACCOUNT_SID=
@@ -1526,7 +1713,6 @@ hdr "8 / 10  PLAYWRIGHT + CHROMIUM"
 log "Installing Chromium..."
 playwright install chromium
 xattr -cr ~/Library/Caches/ms-playwright/ 2>/dev/null || true
-log "Testing Playwright..."
 python3 -c "
 from playwright.sync_api import sync_playwright
 try:
@@ -1542,20 +1728,19 @@ except Exception as e:
 ok "Playwright + Chromium ready"
 
 hdr "9 / 10  PULLING AI MODELS"
-log "Pulling $CODING ($MREASON)..."
+log "Pulling $CODING..."
 ollama pull "$CODING"
 ok "$CODING ready"
 
-log "Pulling $PRIMARY (conversational)..."
+log "Pulling $PRIMARY (conversation)..."
 ollama pull "$PRIMARY"
 ok "$PRIMARY ready"
 
-log "Pulling llava vision model..."
+log "Pulling llava (vision)..."
 ollama pull llava
 ok "llava ready"
 
-log "Pulling $REASON (deep reasoning)..."
-log "This is large — may take 30-60 min on first install"
+log "Pulling $REASON (reasoning — may take 20-40 min)..."
 ollama pull "$REASON"
 ok "$REASON ready"
 
@@ -1588,6 +1773,8 @@ cat > ~/Library/LaunchAgents/com.workerbee.agent.plist << PLIST
   <dict>
     <key>OLLAMA_HOST</key><string>http://localhost:11434</string>
     <key>DEFAULT_MODEL</key><string>${PRIMARY}</string>
+    <key>CODING_MODEL</key><string>${CODING}</string>
+    <key>REASON_MODEL</key><string>${REASON}</string>
     <key>PATH</key><string>/Users/${USER}/worker-bee/.venv/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
   </dict>
 </dict>
@@ -1604,25 +1791,27 @@ ok "Type 'wb' anywhere to start Worker Bee"
 
 clear
 echo -e "${GRN}${BLD}"
-echo "  WORKER BEE v3.0 IS READY"
+echo "  🐝  WORKER BEE v3.1 IS READY"
 echo -e "${NC}"
-echo -e "  ${GRN}[OK]${NC} Ollama          http://localhost:11434"
-echo -e "  ${GRN}[OK]${NC} Agent           https://localhost:8000"
-echo -e "  ${GRN}[OK]${NC} Vision          llava installed"
-echo -e "  ${GRN}[OK]${NC} Browser         Playwright + Chromium"
-echo -e "  ${GRN}[OK]${NC} Memory          ChromaDB persistent"
-echo -e "  ${GRN}[OK]${NC} Planner         autonomous task execution"
-echo -e "  ${GRN}[OK]${NC} GitHub          code reader/writer"
-echo -e "  ${GRN}[OK]${NC} Gmail           inbox manager"
-echo -e "  ${GRN}[OK]${NC} Self-repair     qwen monitors itself"
-echo -e "  ${GRN}[OK]${NC} Login engine    5-strategy persistent login"
-echo -e "  ${GRN}[OK]${NC} Auto-start      starts on every login"
-echo -e "  ${GRN}[OK]${NC} Models:         $PRIMARY | $CODING | $REASON | llava"
+echo -e "  ${GRN}[OK]${NC} Agent        https://localhost:8000"
+echo -e "  ${GRN}[OK]${NC} Models       $PRIMARY | $CODING | $REASON | llava"
+echo -e "  ${GRN}[OK]${NC} Memory       ChromaDB persistent"
+echo -e "  ${GRN}[OK]${NC} Browser      Playwright + Chromium"
+echo -e "  ${GRN}[OK]${NC} Vision       llava + GitHub push"
+echo -e "  ${GRN}[OK]${NC} Planner      autonomous tasks"
+echo -e "  ${GRN}[OK]${NC} GitHub       code reader/writer"
+echo -e "  ${GRN}[OK]${NC} Self-repair  auto-fixes itself"
+echo -e "  ${GRN}[OK]${NC} Auto-start   starts on every login"
 echo ""
-echo -e "  NEXT: Visit https://localhost:8000/health in Safari"
-echo -e "        Click through the security warning (one time only)"
-echo -e "  UI:   https://worker-bee.lovable.app"
-echo -e "  LOGS: tail -f /tmp/workerbee.log"
+echo -e "  ${AMB}NEXT STEPS:${NC}"
+echo -e "  1. Visit https://localhost:8000/health in Safari"
+echo -e "     Click through the security warning (one time)"
+echo -e "  2. Open https://worker-bee.lovable.app"
+echo -e "  3. Add your GitHub token to ~/worker-bee/.env"
+echo -e "     nano ~/worker-bee/.env"
+echo ""
+echo -e "  ${AMB}DAILY:${NC} type 'wb' in any terminal"
+echo -e "  ${AMB}LOGS:${NC}  tail -f /tmp/workerbee.log"
 echo ""
 echo -e "${GRN}Starting agent...${NC}"
 echo ""
